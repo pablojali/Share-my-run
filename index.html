@@ -1,0 +1,79 @@
+<script type="module">
+  // Importar Firebase y la base de datos
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+
+  // Configuración del proyecto (tuya, está bien)
+  const firebaseConfig = {
+    apiKey: "AIzaSyAB0g-F_TjG4Te-28BMwUa-shguHyB5iV8",
+    authDomain: "share-my-run.firebaseapp.com",
+    databaseURL: "https://share-my-run-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "share-my-run",
+    storageBucket: "share-my-run.firebasestorage.app",
+    messagingSenderId: "1029737285693",
+    appId: "1:1029737285693:web:5e26b317207f1df5500254"
+  };
+
+  // Inicializar Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // Identificadores de prueba (luego serán dinámicos)
+  const carreraId = "carrera123";
+  const corredorId = "runner001";
+
+  // --- Función principal ---
+  function startTracking() {
+    if (!navigator.geolocation) {
+      alert("Geolocalización no soportada por este dispositivo.");
+      return;
+    }
+
+    document.getElementById("status").textContent = "⏳ Solicitando permiso para ubicación...";
+
+    // Pide permiso al usuario y obtiene la primera posición
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        document.getElementById("status").textContent = "✅ Permiso concedido. Iniciando seguimiento cada 30s...";
+        sendPosition(); // primer envío inmediato
+        setInterval(sendPosition, 30 * 1000); // cada 30 segundos
+      },
+      (err) => {
+        document.getElementById("status").textContent = "❌ Error: " + err.message;
+        console.error("Error de geolocalización:", err);
+      },
+      { enableHighAccuracy: true }
+    );
+  }
+
+  // --- Función que obtiene y envía la posición ---
+  function sendPosition() {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const timestamp = Date.now();
+
+        // Guarda la posición en la base de datos
+        set(ref(db, `posiciones/${carreraId}/${corredorId}`), {
+          lat: latitude,
+          lon: longitude,
+          timestamp: timestamp
+        });
+
+        document.getElementById("status").textContent =
+          `📍 Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)} (enviado a Firebase)`;
+      },
+      (err) => console.error("Error GPS:", err),
+      { enableHighAccuracy: true }
+    );
+  }
+
+  // Conectar el botón
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("startTracking").addEventListener("click", startTracking);
+  });
+</script>
+
+<!-- Controles -->
+<button id="startTracking">Iniciar seguimiento GPS</button>
+<div id="status"></div>
