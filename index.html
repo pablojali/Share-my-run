@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <title>Share My Run - Seguimiento</title>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body, html { margin: 0; padding: 0; height: 100%; }
-    #map { width: 100%; height: 100%; }
+    #map { width: 100%; height: 90%; }
+    #controls { height: 10%; display: flex; align-items: center; justify-content: center; background: #eee; }
     .marker-label { font-weight: bold; color: black; background-color: white; padding: 2px 4px; border-radius: 4px; }
   </style>
 </head>
 <body>
+  <div id="controls">
+    <input type="file" id="gpxFile" accept=".gpx" />
+  </div>
   <div id="map"></div>
 
   <!-- Leaflet -->
@@ -40,24 +41,13 @@
 
     // === Mapa Leaflet ===
     var map = L.map('map').setView([0, 0], 13);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    // === Cargar GPX ===
-    // Reemplaza "ruta.gpx" con tu GPX
-    var gpx = new L.GPX("ruta.gpx", {
-      async: true,
-      marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '' }
-    }).on('loaded', function(e) {
-      map.fitBounds(e.target.getBounds());
     }).addTo(map);
 
     // === Marcadores de corredores ===
     var corredoresMarkers = {};
 
-    // Escuchar cambios en Firebase
     db.ref('corredores/demo_carrera').on('value', snapshot => {
       var data = snapshot.val();
       for (var dorsal in data) {
@@ -67,15 +57,28 @@
 
         var latlng = [pos.lat, pos.lon];
         if (corredoresMarkers[dorsal]) {
-          // Mover marcador existente
           corredoresMarkers[dorsal].setLatLng(latlng);
         } else {
-          // Crear nuevo marcador
           var marker = L.marker(latlng).addTo(map)
             .bindPopup(`<div class="marker-label">${corredor.nombre} (#${dorsal})</div>`);
           corredoresMarkers[dorsal] = marker;
         }
       }
+    });
+
+    // === Cargar GPX desde archivo local ===
+    document.getElementById('gpxFile').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function() {
+        var gpxText = reader.result;
+        var gpxLayer = new L.GPX(gpxText, { async: true }).on('loaded', function(e) {
+          map.fitBounds(e.target.getBounds());
+        }).addTo(map);
+      };
+      reader.readAsText(file);
     });
   </script>
 </body>
