@@ -1,79 +1,82 @@
-<script type="module">
-  // Importar Firebase y la base de datos
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-  import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Share My Run - Seguimiento</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    .marker-label { font-weight: bold; color: black; background-color: white; padding: 2px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
 
-  // Configuración del proyecto (tuya, está bien)
-  const firebaseConfig = {
-    apiKey: "AIzaSyAB0g-F_TjG4Te-28BMwUa-shguHyB5iV8",
-    authDomain: "share-my-run.firebaseapp.com",
-    databaseURL: "https://share-my-run-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "share-my-run",
-    storageBucket: "share-my-run.firebasestorage.app",
-    messagingSenderId: "1029737285693",
-    appId: "1:1029737285693:web:5e26b317207f1df5500254"
-  };
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet GPX -->
+  <script src="https://unpkg.com/leaflet-gpx/gpx.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-  // Inicializar Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+  <script>
+    // === Configuración Firebase ===
+    var firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "share-my-run.firebaseapp.com",
+      databaseURL: "https://share-my-run-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "share-my-run",
+      storageBucket: "share-my-run.appspot.com",
+      messagingSenderId: "TU_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.database();
 
-  // Identificadores de prueba (luego serán dinámicos)
-  const carreraId = "carrera123";
-  const corredorId = "runner001";
+    // === Mapa Leaflet ===
+    var map = L.map('map').setView([0, 0], 13);
 
-  // --- Función principal ---
-  function startTracking() {
-    if (!navigator.geolocation) {
-      alert("Geolocalización no soportada por este dispositivo.");
-      return;
-    }
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
 
-    document.getElementById("status").textContent = "⏳ Solicitando permiso para ubicación...";
+    // === Cargar GPX ===
+    // Reemplaza "ruta.gpx" con tu GPX
+    var gpx = new L.GPX("ruta.gpx", {
+      async: true,
+      marker_options: { startIconUrl: '', endIconUrl: '', shadowUrl: '' }
+    }).on('loaded', function(e) {
+      map.fitBounds(e.target.getBounds());
+    }).addTo(map);
 
-    // Pide permiso al usuario y obtiene la primera posición
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        document.getElementById("status").textContent = "✅ Permiso concedido. Iniciando seguimiento cada 30s...";
-        sendPosition(); // primer envío inmediato
-        setInterval(sendPosition, 30 * 1000); // cada 30 segundos
-      },
-      (err) => {
-        document.getElementById("status").textContent = "❌ Error: " + err.message;
-        console.error("Error de geolocalización:", err);
-      },
-      { enableHighAccuracy: true }
-    );
-  }
+    // === Marcadores de corredores ===
+    var corredoresMarkers = {};
 
-  // --- Función que obtiene y envía la posición ---
-  function sendPosition() {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const timestamp = Date.now();
+    // Escuchar cambios en Firebase
+    db.ref('corredores/demo_carrera').on('value', snapshot => {
+      var data = snapshot.val();
+      for (var dorsal in data) {
+        var corredor = data[dorsal];
+        var pos = corredor.ultimaPosicion;
+        if (!pos) continue;
 
-        // Guarda la posición en la base de datos
-        set(ref(db, `posiciones/${carreraId}/${corredorId}`), {
-          lat: latitude,
-          lon: longitude,
-          timestamp: timestamp
-        });
-
-        document.getElementById("status").textContent =
-          `📍 Lat: ${latitude.toFixed(5)}, Lon: ${longitude.toFixed(5)} (enviado a Firebase)`;
-      },
-      (err) => console.error("Error GPS:", err),
-      { enableHighAccuracy: true }
-    );
-  }
-
-  // Conectar el botón
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("startTracking").addEventListener("click", startTracking);
-  });
-</script>
-
-<!-- Controles -->
-<button id="startTracking">Iniciar seguimiento GPS</button>
-<div id="status"></div>
+        var latlng = [pos.lat, pos.lon];
+        if (corredoresMarkers[dorsal]) {
+          // Mover marcador existente
+          corredoresMarkers[dorsal].setLatLng(latlng);
+        } else {
+          // Crear nuevo marcador
+          var marker = L.marker(latlng).addTo(map)
+            .bindPopup(`<div class="marker-label">${corredor.nombre} (#${dorsal})</div>`);
+          corredoresMarkers[dorsal] = marker;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
